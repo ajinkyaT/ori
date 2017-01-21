@@ -1,2 +1,2 @@
 # ori
-amazon web scraper
+web scraper
