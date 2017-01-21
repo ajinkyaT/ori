@@ -8,21 +8,23 @@ import bs4 as bs
 import lxml
 
 
-class AmazonProductSpider(scrapy.Spider):
+class AmazonProductSpider(CrawlSpider):
     name = "Amazon2"
     allowed_domains = ["amazon.in"]
 
     # Use working product URL below
-    start_urls = ["http://www.amazon.in/LG-LSA3SP5D-Split-Rating-White/dp/B00LFA5H7A/ref=sr_1_6?s=kitchen&ie=UTF8&qid=1484927673&sr=1-6"]
- #    rules = (
- #        Rule(LxmlLinkExtractor(allow=(r'(dp)\/([A-Z])([A-Z0-9]{9})'), restrict_xpaths=('//*[(@id = "atfResults")]',)), callback="parse_item",),
-	# )
+    start_urls = ["http://www.amazon.in/s/ref=sr_pg_2?fst=as%3Aoff&rh=n%3A976442031%2Cn%3A!976443031%2Cn%3A1380263031%2Cn%3A3474656031%2Cp_n_feature_thirteen_browse-bin%3A2753048031|2753047031&page={}&bbn=3474656031&ie=UTF8&qid=1485024415".format(x) for  x in list(range(1,48,1))]
+    # start_urls = ["http://www.amazon.in/s/ref=sr_pg_2?fst=as%3Aoff&rh=n%3A976442031%2Cn%3A!976443031%2Cn%3A1380263031%2Cn%3A3474656031%2Cp_n_feature_thirteen_browse-bin%3A2753048031|2753047031&page=1&bbn=3474656031&ie=UTF8&qid=1485024415"]
+
+    rules = (
+        Rule(LxmlLinkExtractor(allow=(r'(dp)\/([A-Z])([A-Z0-9]{9})'),deny=(r'(.in)\/(dp)\/([A-Z])([A-Z0-9]{9})'), unique=True,), callback="parse_item",),
+	)
     
 
-    def parse(self,response):
+    def parse_item(self,response):
         items = Amazon1Item()
   #       items['Item_name'] = response.xpath('//*[@id="productTitle"]/text()').extract()
-  #       items['Item_href'] = response.url
+        items['Item_href'] = response.url
   #       items['Model'] = response.xpath('//*[@id="prodDetails"]/div/div[1]/div/div[2]/div/div/table/tbody/tr[2]/td[2]/text()').extract()
   #       items['Energy_Efficiency'] = response.xpath('//*[@id="prodDetails"]/div/div[1]/div/div[2]/div/div/table/tbody/tr[3]/td[2]/text()').extract()
   #       items['Capacity'] = response.xpath('//*[@id="prodDetails"]/div/div[1]/div/div[2]/div/div/table/tbody/tr[4]/td[2]/text()').extract()
@@ -40,14 +42,22 @@ class AmazonProductSpider(scrapy.Spider):
   #       items['No_of_Reviews'] = response.xpath('//*[@id="acrCustomerReviewText"]/text()').extract()
   #       items['Average_Rating'] = response.xpath('//*[(@id = "averageCustomerReviewRating")]/text()').extract()
         soup=bs.BeautifulSoup(response.text,"lxml")
-        items['Item_name']=soup.title.string
+        items['Item_name']=soup.title.text.encode('ascii')
         try:
             for string in soup.find("span",class_="a-text-strike").stripped_strings:
              items['MRP']=string.encode('ascii')
         except Exception: pass 
-        try:items['Offer_Price'] = response.xpath('//*[@id="priceblock_saleprice"]/text()').extract()
+        try:
+            items['Offer_Price'] = response.xpath('//*[@id="priceblock_saleprice"]/text()').extract()[0].encode("ascii")
+            
         except Exception: pass
-        try:items['Offer_Price'] = response.xpath('//*[@id="priceblock_ourprice"]/text()').extract()
+        try:
+            items['Offer_Price'] = response.xpath('//*[@id="priceblock_ourprice"]/text()').extract()[0].encode("ascii")
+            
+        except Exception: pass
+        try:
+            items['Offer_Price'] = response.xpath('//*[@id="priceblock_dealprice"]/text()').extract()[0].encode("ascii")
+            
         except Exception: pass
         try:
             items['Offer_Price'] = response.xpath('//*[@id="olp_feature_div"]/div/span/span/text()').extract()
@@ -85,8 +95,11 @@ class AmazonProductSpider(scrapy.Spider):
         except Exception: pass
         try:items['Average_Rating'] =table2.find(id="averageCustomerReviewRating").text.encode('ascii')
         except Exception: pass
-        try:items['Best_Sellers_Rank_Category']=table2.find("td",text='Best Sellers Rank').next_sibling.get_text(strip=True).split()[0].encode('ascii')
+        try:items['Best_Sellers_Rank_Category_home_kitchen']=table2.find("td",text='Best Sellers Rank').next_sibling.get_text(strip=True).split()[0].encode('ascii')
         except Exception: pass
+        try:items['Best_Sellers_Rank_Category_AC']=table2.find("span",class_='zg_hrsr_rank').text.encode('ascii')
+        except Exception: pass
+
         try:
             count=0
             reviews=soup.find('div',id="revMHRL")
@@ -94,6 +107,6 @@ class AmazonProductSpider(scrapy.Spider):
              if len(item["class"]) != 1:
                  continue;
              count+=1
-             items['Review_{}'.format(count)]=item.text.encode('ascii')
+             items['Review_{}'.format(count)]=item.get_text(strip=True).encode('ascii')
         except Exception: pass
         return items
